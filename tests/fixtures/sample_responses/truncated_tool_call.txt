@@ -1,0 +1,5 @@
+Testing the endpoint now.
+
+<function=browser_actions.navigate>
+<parameter=url>https://target.com/api/users</parameter>
+</

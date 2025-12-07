@@ -1,0 +1,5 @@
+I'll analyze the endpoint for SQL injection vulnerabilities.
+
+<function=browser_actions.navigate>
+<parameter=url>https://target.com/api/users?id=1</parameter>
+</function>

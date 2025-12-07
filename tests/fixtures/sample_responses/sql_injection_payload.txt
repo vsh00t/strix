@@ -1,0 +1,3 @@
+<function=browser_actions.navigate>
+<parameter=url>https://target.com/users?id=1' OR '1'='1</parameter>
+</function>

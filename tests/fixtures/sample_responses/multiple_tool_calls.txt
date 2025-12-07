@@ -1,0 +1,6 @@
+<function=tool1>
+<parameter=arg1>value1</parameter>
+</function>
+<function=tool2>
+<parameter=arg2>value2</parameter>
+</function>

@@ -1,0 +1,407 @@
+"""
+Unit tests for strix/llm/utils.py
+
+Tests cover:
+- Tool invocation parsing
+- Stopword fixing
+- Function truncation
+- HTML entity decoding
+- Content cleaning
+"""
+
+import pytest
+from strix.llm.utils import (
+    parse_tool_invocations,
+    _fix_stopword,
+    _truncate_to_first_function,
+    format_tool_call,
+    clean_content,
+)
+
+
+class TestParseToolInvocations:
+    """Tests for parse_tool_invocations function."""
+
+    def test_parse_valid_single_function(self) -> None:
+        """Test parsing a valid single function call."""
+        content = """<function=test_tool>
+<parameter=arg1>value1</parameter>
+</function>"""
+        result = parse_tool_invocations(content)
+        
+        assert result is not None
+        assert len(result) == 1
+        assert result[0]["toolName"] == "test_tool"
+        assert result[0]["args"]["arg1"] == "value1"
+
+    def test_parse_function_with_multiple_parameters(self) -> None:
+        """Test parsing function with multiple parameters."""
+        content = """<function=browser_actions.navigate>
+<parameter=url>https://example.com</parameter>
+<parameter=method>GET</parameter>
+<parameter=headers>{"Authorization": "Bearer token"}</parameter>
+</function>"""
+        result = parse_tool_invocations(content)
+        
+        assert result is not None
+        assert len(result) == 1
+        assert result[0]["toolName"] == "browser_actions.navigate"
+        assert result[0]["args"]["url"] == "https://example.com"
+        assert result[0]["args"]["method"] == "GET"
+        assert "Authorization" in result[0]["args"]["headers"]
+
+    def test_parse_function_with_multiline_parameter(self) -> None:
+        """Test parsing function with multiline parameter value."""
+        content = """<function=python_actions.execute>
+<parameter=code>def test():
+    print("hello")
+    return True</parameter>
+</function>"""
+        result = parse_tool_invocations(content)
+        
+        assert result is not None
+        assert len(result) == 1
+        assert "def test():" in result[0]["args"]["code"]
+        assert 'print("hello")' in result[0]["args"]["code"]
+
+    def test_parse_html_entities_decoded(self) -> None:
+        """Test that HTML entities are properly decoded."""
+        content = """<function=python_actions.execute>
+<parameter=code>if x &lt; 10 and y &gt; 5:
+    print(&quot;valid&quot;)
+    data = {&apos;key&apos;: &amp;value}</parameter>
+</function>"""
+        result = parse_tool_invocations(content)
+        
+        assert result is not None
+        code = result[0]["args"]["code"]
+        assert "x < 10" in code
+        assert "y > 5" in code
+        assert '"valid"' in code
+        assert "{'key':" in code
+        assert "&value" in code
+
+    def test_parse_empty_content_returns_none(self) -> None:
+        """Test that empty content returns None."""
+        assert parse_tool_invocations("") is None
+        assert parse_tool_invocations("   ") is None
+
+    def test_parse_no_function_returns_none(self) -> None:
+        """Test that content without function returns None."""
+        content = "I analyzed the target and found no vulnerabilities."
+        assert parse_tool_invocations(content) is None
+
+    def test_parse_truncated_function_with_autofix(self) -> None:
+        """Test that truncated function tags are auto-fixed."""
+        content = """<function=test_tool>
+<parameter=arg1>value1</parameter>
+</"""
+        result = parse_tool_invocations(content)
+        
+        assert result is not None
+        assert len(result) == 1
+        assert result[0]["toolName"] == "test_tool"
+
+    def test_parse_function_without_closing_tag(self) -> None:
+        """Test handling of function without any closing tag."""
+        content = """<function=test_tool>
+<parameter=arg1>value1</parameter>"""
+        result = parse_tool_invocations(content)
+        
+        # Should auto-fix and parse
+        assert result is not None
+        assert len(result) == 1
+
+    def test_parse_multiple_functions(self) -> None:
+        """Test parsing multiple functions (all should be captured)."""
+        content = """<function=tool1>
+<parameter=a>1</parameter>
+</function>
+<function=tool2>
+<parameter=b>2</parameter>
+</function>"""
+        result = parse_tool_invocations(content)
+        
+        assert result is not None
+        assert len(result) == 2
+        assert result[0]["toolName"] == "tool1"
+        assert result[1]["toolName"] == "tool2"
+
+    def test_parse_function_with_special_characters_in_value(self) -> None:
+        """Test parsing function with special characters in parameter values."""
+        content = """<function=browser_actions.navigate>
+<parameter=url>https://target.com/search?q=test&page=1&sort=desc</parameter>
+</function>"""
+        result = parse_tool_invocations(content)
+        
+        assert result is not None
+        url = result[0]["args"]["url"]
+        assert "q=test" in url
+        assert "page=1" in url
+
+    def test_parse_function_with_empty_parameter(self) -> None:
+        """Test parsing function with empty parameter value."""
+        content = """<function=test_tool>
+<parameter=empty></parameter>
+<parameter=filled>value</parameter>
+</function>"""
+        result = parse_tool_invocations(content)
+        
+        assert result is not None
+        assert result[0]["args"]["empty"] == ""
+        assert result[0]["args"]["filled"] == "value"
+
+
+class TestFixStopword:
+    """Tests for _fix_stopword function."""
+
+    def test_fix_truncated_closing_tag(self) -> None:
+        """Test fixing truncated </function> tag."""
+        content = "<function=test>\n<parameter=x>y</parameter>\n</"
+        result = _fix_stopword(content)
+        assert result.endswith("</function>")
+
+    def test_fix_missing_closing_tag(self) -> None:
+        """Test adding missing </function> tag."""
+        content = "<function=test>\n<parameter=x>y</parameter>"
+        result = _fix_stopword(content)
+        assert "</function>" in result
+
+    def test_no_fix_needed_complete_tag(self) -> None:
+        """Test that complete tags are not modified."""
+        content = "<function=test>\n<parameter=x>y</parameter>\n</function>"
+        result = _fix_stopword(content)
+        assert result == content
+
+    def test_no_fix_for_multiple_functions(self) -> None:
+        """Test that multiple functions are not auto-fixed."""
+        content = "<function=a></function><function=b>"
+        result = _fix_stopword(content)
+        # Should not add closing tag when multiple functions exist
+        assert result == content
+
+    def test_no_fix_for_no_function(self) -> None:
+        """Test that content without function is not modified."""
+        content = "Just some text without any function"
+        result = _fix_stopword(content)
+        assert result == content
+
+
+class TestTruncateToFirstFunction:
+    """Tests for _truncate_to_first_function function."""
+
+    def test_truncate_removes_second_function(self) -> None:
+        """Test that second function is removed."""
+        content = """<function=first>
+<parameter=a>1</parameter>
+</function>
+<function=second>
+<parameter=b>2</parameter>
+</function>"""
+        result = _truncate_to_first_function(content)
+        
+        assert "<function=first>" in result
+        assert "<function=second>" not in result
+
+    def test_truncate_preserves_single_function(self) -> None:
+        """Test that single function is preserved."""
+        content = """Some text
+<function=only_one>
+<parameter=x>value</parameter>
+</function>"""
+        result = _truncate_to_first_function(content)
+        assert result == content
+
+    def test_truncate_empty_content(self) -> None:
+        """Test handling of empty content."""
+        assert _truncate_to_first_function("") == ""
+        assert _truncate_to_first_function(None) is None  # type: ignore
+
+    def test_truncate_preserves_text_before_function(self) -> None:
+        """Test that text before first function is preserved."""
+        content = """I'll analyze the endpoint.
+
+<function=test>
+<parameter=a>1</parameter>
+</function>
+<function=second>
+<parameter=b>2</parameter>
+</function>"""
+        result = _truncate_to_first_function(content)
+        
+        assert "I'll analyze the endpoint" in result
+        assert "<function=test>" in result
+        assert "<function=second>" not in result
+
+
+class TestFormatToolCall:
+    """Tests for format_tool_call function."""
+
+    def test_format_simple_tool_call(self) -> None:
+        """Test formatting a simple tool call."""
+        result = format_tool_call("test_tool", {"arg1": "value1"})
+        
+        assert "<function=test_tool>" in result
+        assert "<parameter=arg1>value1</parameter>" in result
+        assert "</function>" in result
+
+    def test_format_tool_call_multiple_args(self) -> None:
+        """Test formatting tool call with multiple arguments."""
+        result = format_tool_call(
+            "browser_actions.navigate",
+            {"url": "https://example.com", "method": "POST"},
+        )
+        
+        assert "<function=browser_actions.navigate>" in result
+        assert "<parameter=url>https://example.com</parameter>" in result
+        assert "<parameter=method>POST</parameter>" in result
+
+    def test_format_tool_call_empty_args(self) -> None:
+        """Test formatting tool call with no arguments."""
+        result = format_tool_call("simple_tool", {})
+        
+        assert "<function=simple_tool>" in result
+        assert "</function>" in result
+        assert "<parameter=" not in result
+
+
+class TestCleanContent:
+    """Tests for clean_content function."""
+
+    def test_clean_removes_function_tags(self) -> None:
+        """Test that complete function blocks are removed from content."""
+        content = """Here is my analysis.
+
+<function=test>
+<parameter=x>y</parameter>
+</function>
+
+More text here."""
+        result = clean_content(content)
+        
+        # The function block itself should be removed
+        assert "<function=test>" not in result
+        assert "<parameter=x>" not in result
+        assert "Here is my analysis" in result
+        assert "More text here" in result
+
+    def test_clean_removes_complete_function_block(self) -> None:
+        """Test that a standalone function block is fully removed."""
+        content = "<function=tool><parameter=x>y</parameter></function>"
+        result = clean_content(content)
+        assert result == ""
+
+    def test_clean_removes_inter_agent_messages(self) -> None:
+        """Test that inter_agent_message XML is removed."""
+        content = """Response text.
+
+<inter_agent_message>
+<sender>agent1</sender>
+<content>Internal message</content>
+</inter_agent_message>
+
+More response."""
+        result = clean_content(content)
+        
+        assert "<inter_agent_message>" not in result
+        assert "Internal message" not in result
+        assert "Response text" in result
+
+    def test_clean_removes_agent_completion_report(self) -> None:
+        """Test that agent_completion_report XML is removed."""
+        content = """<agent_completion_report>
+<status>completed</status>
+</agent_completion_report>
+Visible content."""
+        result = clean_content(content)
+        
+        assert "<agent_completion_report>" not in result
+        assert "Visible content" in result
+
+    def test_clean_empty_content(self) -> None:
+        """Test handling of empty content."""
+        assert clean_content("") == ""
+        assert clean_content("   ") == ""
+
+    def test_clean_normalizes_whitespace(self) -> None:
+        """Test that excessive whitespace is normalized."""
+        content = "Line 1\n\n\n\n\nLine 2"
+        result = clean_content(content)
+        
+        # Should have at most double newlines
+        assert "\n\n\n" not in result
+        assert "Line 1" in result
+        assert "Line 2" in result
+
+    def test_clean_fixes_truncated_function(self) -> None:
+        """Test that truncated functions are fixed before cleaning."""
+        content = """Text before
+<function=test>
+<parameter=a>b</parameter>
+</
+Text after"""
+        result = clean_content(content)
+        
+        # Should fix the truncated tag and then remove the function
+        assert "<function=" not in result
+        assert "Text before" in result
+
+
+class TestParseToolInvocationsEdgeCases:
+    """Edge case tests for tool invocation parsing."""
+
+    def test_parse_nested_angle_brackets(self) -> None:
+        """Test parsing with nested angle brackets in values."""
+        content = """<function=test>
+<parameter=html><div><span>test</span></div></parameter>
+</function>"""
+        result = parse_tool_invocations(content)
+        
+        assert result is not None
+        # This is a known limitation - nested tags may cause issues
+        # The test documents current behavior
+
+    def test_parse_sql_injection_payload(self) -> None:
+        """Test parsing SQL injection payloads."""
+        content = """<function=browser_actions.navigate>
+<parameter=url>https://target.com/users?id=1' OR '1'='1</parameter>
+</function>"""
+        result = parse_tool_invocations(content)
+        
+        assert result is not None
+        assert "1' OR '1'='1" in result[0]["args"]["url"]
+
+    def test_parse_xss_payload(self) -> None:
+        """Test parsing XSS payloads (HTML entities)."""
+        content = """<function=browser_actions.navigate>
+<parameter=url>https://target.com/search?q=&lt;script&gt;alert(1)&lt;/script&gt;</parameter>
+</function>"""
+        result = parse_tool_invocations(content)
+        
+        assert result is not None
+        url = result[0]["args"]["url"]
+        # HTML entities should be decoded
+        assert "<script>" in url
+        assert "</script>" in url
+
+    def test_parse_unicode_content(self) -> None:
+        """Test parsing Unicode content."""
+        content = """<function=test>
+<parameter=text>こんにちは世界 🎉 émojis</parameter>
+</function>"""
+        result = parse_tool_invocations(content)
+        
+        assert result is not None
+        assert "こんにちは世界" in result[0]["args"]["text"]
+        assert "🎉" in result[0]["args"]["text"]
+
+    def test_parse_very_long_parameter(self) -> None:
+        """Test parsing very long parameter values."""
+        long_value = "A" * 10000
+        content = f"""<function=test>
+<parameter=data>{long_value}</parameter>
+</function>"""
+        result = parse_tool_invocations(content)
+        
+        assert result is not None
+        assert result[0]["args"]["data"] == long_value
