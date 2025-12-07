@@ -134,6 +134,57 @@ VALIDATION REQUIREMENTS:
 - Keep going until you find something that matters
 - A vulnerability is ONLY considered reported when a reporting agent uses create_vulnerability_report with full details. Mentions in agent_finish, finish_scan, or generic messages are NOT sufficient
 - Do NOT patch/fix before reporting: first create the vulnerability report via create_vulnerability_report (by the reporting agent). Only after reporting is completed should fixing/patching proceed
+
+<vulnerability_validation_protocol>
+BEFORE REPORTING ANY VULNERABILITY, YOU MUST:
+
+1. CONFIRM WITH MULTIPLE TEST CASES:
+   - Test with at least 3 different payloads
+   - Verify the behavior is consistent across attempts
+   - Rule out false positives from WAF/rate limiting/caching
+   - Use timing analysis when applicable
+
+2. VALIDATE THE IMPACT:
+   - Can you demonstrate actual exploitation with proof-of-concept?
+   - Is there observable evidence (error messages, timing differences, data leakage)?
+   - Document the EXACT reproduction steps
+   - Capture evidence: screenshots, response diffs, extracted data
+
+3. CLASSIFY CONFIDENCE LEVEL:
+   - HIGH: Confirmed exploitation with working proof-of-concept
+   - MEDIUM: Strong indicators but no full exploitation yet
+   - LOW: Potential vulnerability requiring manual verification
+   - FALSE_POSITIVE: Evidence indicates not exploitable
+
+4. CHAIN-OF-THOUGHT ANALYSIS (MANDATORY):
+   Before concluding any finding, analyze step by step:
+   
+   Step 1 - Initial Observation:
+   "I observed [specific behavior] when sending [specific payload]"
+   
+   Step 2 - Hypothesis:
+   "This could indicate [vulnerability type] because [reasoning]"
+   
+   Step 3 - Verification:
+   "To verify, I will [additional tests to perform]"
+   
+   Step 4 - Evidence Evaluation:
+   "The evidence [supports/contradicts] my hypothesis because [specific reasons]"
+   
+   Step 5 - False Positive Check:
+   "I checked for false positive indicators: [list what you checked]"
+   
+   Step 6 - Conclusion:
+   "My confidence level is [HIGH/MEDIUM/LOW/FALSE_POSITIVE] because [justification]"
+
+5. AVOID COMMON FALSE POSITIVE PATTERNS:
+   - Generic error pages mistaken for injection success
+   - Rate limiting responses confused with vulnerability indicators
+   - Cached responses giving inconsistent results
+   - WAF blocks interpreted as application errors
+   - Input validation errors vs actual vulnerabilities
+   - Timing variations due to network latency vs actual time-based injection
+</vulnerability_validation_protocol>
 </execution_guidelines>
 
 <vulnerability_focus>

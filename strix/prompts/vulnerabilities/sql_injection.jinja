@@ -120,12 +120,50 @@
 5. Where applicable, demonstrate defense-in-depth bypass (WAF on, still exploitable via variant).
 </validation>
 
-<false_positives>
-- Generic errors unrelated to SQL parsing or constraints
-- Static response sizes due to templating rather than predicate truth
-- Artificial delays from network/CPU unrelated to injected function calls
-- Parameterized queries with no string concatenation, verified by code review
-</false_positives>
+<false_positive_indicators>
+These responses typically indicate FALSE POSITIVES - not actual SQL injection:
+
+GENERIC APPLICATION ERRORS (NOT SQLi):
+- "Bad Request" or "Invalid parameter" without SQL-specific error messages
+- Generic 400/500 errors without database stack traces
+- "Invalid characters" or "Input validation failed" (input sanitization, not SQLi)
+- "Parameter X must be a number/string/etc" (type validation, not SQLi)
+
+WAF/FIREWALL BLOCKS (NOT SQLi):
+- Cloudflare, Akamai, AWS WAF signature responses
+- "Access Denied" or "Forbidden" with security vendor markers
+- 403 responses with "blocked by security rules" messages
+- Request blocked but no actual SQL execution occurred
+
+RATE LIMITING (NOT SQLi):
+- 429 "Too Many Requests" responses
+- "Rate limit exceeded" messages
+- Consistent delays across all requests (server load, not time-based SQLi)
+
+CACHING ARTIFACTS (NOT SQLi):
+- Same response regardless of payload (static/cached page)
+- ETag/Last-Modified unchanged despite different payloads
+- CDN cache hit headers present
+
+STATIC ERROR PAGES (NOT SQLi):
+- Consistent response size/content for ALL error conditions
+- Generic "Something went wrong" without SQL context
+- Custom error pages that mask actual application errors
+
+ALWAYS DISTINGUISH BETWEEN:
+- Application-level input validation (NOT vuln) - error before SQL execution
+- Database-level error (POTENTIAL vuln) - error contains SQL/DB keywords
+- Actual data exfiltration (CONFIRMED vuln) - retrieved unexpected data
+
+VERIFICATION CHECKLIST:
+□ Does the error message contain actual SQL syntax or DB-specific keywords?
+□ Can you toggle a boolean condition and observe consistent difference?
+□ Does timing vary predictably with injected sleep functions?
+□ Can you extract verifiable data (version, user, table names)?
+□ Is the behavior reproducible across multiple attempts?
+
+If you cannot check at least 2 boxes above, the finding is likely a FALSE POSITIVE.
+</false_positive_indicators>
 
 <impact>
 - Direct data exfiltration and privacy/regulatory exposure

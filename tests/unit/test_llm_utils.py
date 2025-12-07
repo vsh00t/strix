@@ -405,3 +405,292 @@ class TestParseToolInvocationsEdgeCases:
         
         assert result is not None
         assert result[0]["args"]["data"] == long_value
+
+
+# ============================================================================
+# Tests for Tool Validation (Phase 2)
+# ============================================================================
+
+from strix.llm.utils import (
+    validate_tool_invocation,
+    validate_all_invocations,
+    _validate_url,
+    _validate_file_path,
+    _validate_command,
+    KNOWN_TOOLS,
+)
+
+
+class TestValidateToolInvocation:
+    """Tests for validate_tool_invocation function."""
+
+    def test_valid_browser_navigate(self) -> None:
+        """Test validating a valid browser navigation."""
+        invocation = {
+            "toolName": "browser_actions.navigate",
+            "args": {"url": "https://example.com"}
+        }
+        is_valid, errors = validate_tool_invocation(invocation)
+        
+        assert is_valid is True
+        assert len(errors) == 0
+
+    def test_valid_terminal_execute(self) -> None:
+        """Test validating a valid terminal command."""
+        invocation = {
+            "toolName": "terminal.execute",
+            "args": {"command": "ls -la"}
+        }
+        is_valid, errors = validate_tool_invocation(invocation)
+        
+        assert is_valid is True
+        assert len(errors) == 0
+
+    def test_missing_toolname(self) -> None:
+        """Test that missing toolName is detected."""
+        invocation = {"args": {"url": "https://example.com"}}
+        is_valid, errors = validate_tool_invocation(invocation)
+        
+        assert is_valid is False
+        assert "Missing toolName" in errors
+
+    def test_invalid_toolname_type(self) -> None:
+        """Test that non-string toolName is detected."""
+        invocation = {"toolName": 123, "args": {}}
+        is_valid, errors = validate_tool_invocation(invocation)
+        
+        assert is_valid is False
+        assert any("must be a string" in e for e in errors)
+
+    def test_invalid_args_type(self) -> None:
+        """Test that non-dict args is detected."""
+        invocation = {"toolName": "test", "args": "not a dict"}
+        is_valid, errors = validate_tool_invocation(invocation)
+        
+        assert is_valid is False
+        assert any("must be a dictionary" in e for e in errors)
+
+    def test_missing_required_parameter(self) -> None:
+        """Test that missing required parameters are detected."""
+        invocation = {
+            "toolName": "browser_actions.navigate",
+            "args": {}  # Missing 'url' parameter
+        }
+        is_valid, errors = validate_tool_invocation(invocation)
+        
+        assert is_valid is False
+        assert any("Missing required parameter 'url'" in e for e in errors)
+
+    def test_missing_command_parameter(self) -> None:
+        """Test that missing command parameter is detected."""
+        invocation = {
+            "toolName": "terminal.execute",
+            "args": {}  # Missing 'command' parameter
+        }
+        is_valid, errors = validate_tool_invocation(invocation)
+        
+        assert is_valid is False
+        assert any("Missing required parameter 'command'" in e for e in errors)
+
+    def test_invalid_url_scheme(self) -> None:
+        """Test that invalid URL scheme is detected."""
+        invocation = {
+            "toolName": "browser_actions.navigate",
+            "args": {"url": "ftp://example.com"}
+        }
+        is_valid, errors = validate_tool_invocation(invocation)
+        
+        assert is_valid is False
+        assert any("Invalid URL scheme" in e for e in errors)
+
+    def test_valid_http_url(self) -> None:
+        """Test that http:// URLs are valid."""
+        invocation = {
+            "toolName": "browser_actions.navigate",
+            "args": {"url": "http://localhost:8080/api"}
+        }
+        is_valid, errors = validate_tool_invocation(invocation)
+        
+        assert is_valid is True
+
+    def test_valid_https_url(self) -> None:
+        """Test that https:// URLs are valid."""
+        invocation = {
+            "toolName": "browser_actions.navigate",
+            "args": {"url": "https://secure.example.com/path?query=value"}
+        }
+        is_valid, errors = validate_tool_invocation(invocation)
+        
+        assert is_valid is True
+
+    def test_unknown_tool_passes(self) -> None:
+        """Test that unknown tools pass validation (no required params check)."""
+        invocation = {
+            "toolName": "custom_tool.action",
+            "args": {"custom_arg": "value"}
+        }
+        is_valid, errors = validate_tool_invocation(invocation)
+        
+        assert is_valid is True
+
+    def test_empty_args_for_tool_without_required_params(self) -> None:
+        """Test that empty args is valid for tools without required params."""
+        invocation = {
+            "toolName": "browser_actions.screenshot",
+            "args": {}
+        }
+        is_valid, errors = validate_tool_invocation(invocation)
+        
+        assert is_valid is True
+
+
+class TestValidateUrl:
+    """Tests for _validate_url function."""
+
+    def test_valid_http_url(self) -> None:
+        """Test valid http URL."""
+        errors = _validate_url("http://example.com")
+        assert len(errors) == 0
+
+    def test_valid_https_url(self) -> None:
+        """Test valid https URL."""
+        errors = _validate_url("https://example.com/path?query=value")
+        assert len(errors) == 0
+
+    def test_empty_url(self) -> None:
+        """Test empty URL returns error."""
+        errors = _validate_url("")
+        assert "URL is empty" in errors
+
+    def test_invalid_scheme(self) -> None:
+        """Test invalid URL scheme."""
+        errors = _validate_url("ftp://example.com")
+        assert any("Invalid URL scheme" in e for e in errors)
+
+    def test_javascript_scheme_rejected(self) -> None:
+        """Test that javascript: scheme is rejected."""
+        errors = _validate_url("javascript:alert(1)")
+        assert any("Invalid URL scheme" in e for e in errors)
+
+    def test_missing_hostname(self) -> None:
+        """Test URL without hostname."""
+        errors = _validate_url("http:///path")
+        assert any("missing hostname" in e for e in errors)
+
+    def test_complex_url_with_query_and_fragment(self) -> None:
+        """Test complex URL with query and fragment."""
+        errors = _validate_url("https://example.com/path?a=1&b=2#section")
+        assert len(errors) == 0
+
+
+class TestValidateFilePath:
+    """Tests for _validate_file_path function."""
+
+    def test_valid_path(self) -> None:
+        """Test valid file path."""
+        errors = _validate_file_path("/home/user/file.txt")
+        assert len(errors) == 0
+
+    def test_empty_path(self) -> None:
+        """Test empty file path."""
+        errors = _validate_file_path("")
+        assert "file_path is empty" in errors
+
+    def test_relative_path(self) -> None:
+        """Test relative path (should be valid in pentesting context)."""
+        errors = _validate_file_path("../config/secrets.json")
+        # Path traversal is allowed in pentesting context
+        assert len(errors) == 0
+
+
+class TestValidateCommand:
+    """Tests for _validate_command function."""
+
+    def test_valid_command(self) -> None:
+        """Test valid command."""
+        errors = _validate_command("ls -la /home")
+        assert len(errors) == 0
+
+    def test_empty_command(self) -> None:
+        """Test empty command."""
+        errors = _validate_command("")
+        assert "command is empty" in errors
+
+    def test_complex_command(self) -> None:
+        """Test complex piped command."""
+        errors = _validate_command("cat file.txt | grep pattern | sort")
+        assert len(errors) == 0
+
+
+class TestValidateAllInvocations:
+    """Tests for validate_all_invocations function."""
+
+    def test_all_valid_invocations(self) -> None:
+        """Test validating multiple valid invocations."""
+        invocations = [
+            {"toolName": "browser_actions.navigate", "args": {"url": "https://a.com"}},
+            {"toolName": "terminal.execute", "args": {"command": "ls"}},
+        ]
+        all_valid, errors = validate_all_invocations(invocations)
+        
+        assert all_valid is True
+        assert len(errors) == 0
+
+    def test_one_invalid_invocation(self) -> None:
+        """Test with one invalid invocation."""
+        invocations = [
+            {"toolName": "browser_actions.navigate", "args": {"url": "https://a.com"}},
+            {"toolName": "terminal.execute", "args": {}},  # Missing command
+        ]
+        all_valid, errors = validate_all_invocations(invocations)
+        
+        assert all_valid is False
+        assert "1" in errors  # Index 1 has errors
+
+    def test_multiple_invalid_invocations(self) -> None:
+        """Test with multiple invalid invocations."""
+        invocations = [
+            {"args": {}},  # Missing toolName
+            {"toolName": "terminal.execute", "args": {}},  # Missing command
+        ]
+        all_valid, errors = validate_all_invocations(invocations)
+        
+        assert all_valid is False
+        assert "0" in errors
+        assert "1" in errors
+
+    def test_empty_invocations(self) -> None:
+        """Test with empty invocations list."""
+        all_valid, errors = validate_all_invocations([])
+        
+        assert all_valid is True
+        assert len(errors) == 0
+
+    def test_none_invocations(self) -> None:
+        """Test with None invocations."""
+        all_valid, errors = validate_all_invocations(None)
+        
+        assert all_valid is True
+        assert len(errors) == 0
+
+
+class TestKnownTools:
+    """Tests for KNOWN_TOOLS dictionary."""
+
+    def test_known_tools_not_empty(self) -> None:
+        """Test that KNOWN_TOOLS is not empty."""
+        assert len(KNOWN_TOOLS) > 0
+
+    def test_browser_tools_present(self) -> None:
+        """Test that browser tools are present."""
+        assert "browser_actions.navigate" in KNOWN_TOOLS
+        assert "browser_actions.click" in KNOWN_TOOLS
+
+    def test_terminal_tool_present(self) -> None:
+        """Test that terminal tool is present."""
+        assert "terminal.execute" in KNOWN_TOOLS
+
+    def test_required_params_are_lists(self) -> None:
+        """Test that required params are lists."""
+        for tool_name, params in KNOWN_TOOLS.items():
+            assert isinstance(params, list), f"{tool_name} params should be a list"

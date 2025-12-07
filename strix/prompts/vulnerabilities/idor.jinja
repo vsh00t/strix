@@ -164,12 +164,57 @@ query IDOR {
 5. Provide reproducible steps and evidence (requests/responses for owner vs non-owner).
 </validation>
 
-<false_positives>
-- Public/anonymous resources by design
-- Soft-privatized data where content is already public
-- Idempotent metadata lookups that do not reveal sensitive content
-- Correct row-level checks enforced across all channels
-</false_positives>
+<false_positive_indicators>
+These responses typically indicate FALSE POSITIVES - not actual IDOR:
+
+RESOURCE IS PUBLIC BY DESIGN (NOT IDOR):
+- API documentation states the resource is publicly accessible
+- Resource is designed to be shared (public profiles, shared links)
+- Resource has explicit "public" flag/field set to true
+- No authentication required for the endpoint by design
+
+AUTHORIZATION PROPERLY ENFORCED (NOT IDOR):
+- 403 Forbidden with "Access denied" or "Not authorized" message
+- 404 Not Found when resource exists but user has no access (proper hiding)
+- Empty array/null returned when querying other users' resources
+- Consistent denial across all tested object IDs
+
+NOT SENSITIVE DATA (LOW/NO IMPACT):
+- Only username or public profile data accessible
+- Metadata that is intentionally public (user count, public stats)
+- Information already available through other public channels
+- Non-PII data with no privacy/security implications
+
+INSUFFICIENT EVIDENCE (NEEDS MORE VERIFICATION):
+- Only one ID tested (might be a public resource, test with multiple)
+- Response looks different but contains same/similar data
+- No comparison with authenticated owner's view
+- No proof of accessing PRIVATE data of another user
+
+CACHING/CDN ARTIFACTS (NOT IDOR):
+- Cached response from previous request
+- CDN serving stale content
+- Response headers indicate caching (X-Cache: HIT)
+
+VERIFICATION CHECKLIST (MUST PASS ALL):
+□ Can you access PRIVATE data belonging to another user?
+□ Does the owner see different/more data for the same resource?
+□ Is the accessed data actually sensitive (PII, financial, private content)?
+□ Have you verified with at least 2 different user accounts?
+□ Is the resource NOT designed to be public?
+
+EVIDENCE REQUIREMENTS FOR VALID IDOR:
+1. Request as User A accessing User B's private resource
+2. Response showing User B's private data
+3. Comparison: User B accessing same resource shows same data
+4. Comparison: User A accessing their own resource shows different data
+5. Documentation that resource should be private
+
+FALSE POSITIVE SCENARIOS TO AVOID:
+- "I accessed user ID 12345 and got data" → Did you verify 12345 is not YOUR user?
+- "Different response with different ID" → Is the different data actually sensitive?
+- "Got 200 OK" → 200 with empty/public data is not IDOR
+</false_positive_indicators>
 
 <impact>
 - Cross-account data exposure (PII/PHI/PCI)

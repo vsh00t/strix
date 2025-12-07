@@ -388,14 +388,133 @@ git checkout -b feature/fase-1-testing-infrastructure
 ### Objetivo Específico
 Reducir la tasa de falsos positivos en ≥25% mediante la optimización de prompts con técnicas de few-shot learning, chain-of-thought, y validación estructurada.
 
+### ✅ Estado: COMPLETADO (Diciembre 2025)
+
+**Resultados:**
+- 176 tests unitarios pasando (79 nuevos tests de Fase 2)
+- Coverage del módulo LLM: 62% (mejoró de 53%)
+- Sistema de confidence scoring implementado
+- Protocolo de validación Chain-of-Thought agregado
+- Indicadores de falsos positivos detallados en prompts de vulnerabilidades
+
 ### Prerequisitos
 - ✅ Fase 1 completada y mergeada
 - ✅ Suite de tests pasando al 100%
 - ✅ Baseline de métricas establecido
 
-### Cambios Técnicos
+### Cambios Técnicos Implementados
 
-#### 2.1 Refactorizar System Prompt Principal
+#### 2.1 System Prompt Principal Actualizado
+
+**Archivo:** `strix/agents/StrixAgent/system_prompt.jinja`
+
+✅ Agregado `<vulnerability_validation_protocol>` con:
+- Protocolo de confirmación con múltiples test cases
+- Validación de impacto con evidencia
+- Clasificación de niveles de confianza (HIGH/MEDIUM/LOW/FALSE_POSITIVE)
+- Chain-of-Thought (CoT) obligatorio de 6 pasos
+- Lista de patrones comunes de falsos positivos
+
+#### 2.2 Sistema de Confidence Scoring
+
+**Nuevo archivo:** `strix/llm/confidence.py` ✅
+
+```python
+# Funciones implementadas:
+- ConfidenceLevel enum (HIGH, MEDIUM, LOW, FALSE_POSITIVE)
+- VulnerabilityFinding dataclass con serialización
+- calculate_confidence() - calcula confianza basado en indicadores
+- analyze_response_for_fp_indicators() - detecta falsos positivos
+- analyze_response_for_exploitation() - detecta explotación exitosa
+- create_finding() - crea findings con análisis automático
+
+# Diccionarios de patrones:
+- FALSE_POSITIVE_PATTERNS por tipo de vulnerabilidad
+- EXPLOITATION_INDICATORS por tipo de vulnerabilidad
+```
+
+#### 2.3 Validación de Tool Invocations
+
+**Archivo:** `strix/llm/utils.py` ✅
+
+```python
+# Funciones agregadas:
+- validate_tool_invocation() - valida una invocación
+- validate_all_invocations() - valida múltiples invocaciones
+- _validate_url() - valida URLs (esquema, hostname)
+- _validate_file_path() - valida rutas de archivo
+- _validate_command() - valida comandos de terminal
+- KNOWN_TOOLS dict con parámetros requeridos por herramienta
+```
+
+#### 2.4 Prompts de Vulnerabilidades Mejorados
+
+✅ **sql_injection.jinja**: Agregado `<false_positive_indicators>` detallado con:
+- Indicadores de errores genéricos vs SQL
+- Detección de WAF/firewall
+- Rate limiting vs errores reales
+- Checklist de verificación de 5 puntos
+
+✅ **xss.jinja**: Agregado `<false_positive_indicators>` detallado con:
+- Detección de output encoding correcto
+- Verificación de CSP blocking
+- Sanitización activa vs XSS real
+- Evidencia requerida para XSS válido
+
+✅ **idor.jinja**: Agregado `<false_positive_indicators>` detallado con:
+- Recursos públicos vs privados
+- Autorización correctamente implementada
+- Checklist de verificación con 2 cuentas
+- Escenarios de falsos positivos comunes
+
+✅ **ssrf.jinja**: Agregado `<false_positive_indicators>` detallado con:
+- Client-side vs server-side requests
+- Allowlist enforcements
+- Evidencia de OAST con IP del servidor
+- Verificación de egress real
+
+#### 2.5 Tests para Nuevas Funcionalidades
+
+**`tests/unit/test_confidence.py`:** 46 tests ✅
+```python
+- TestConfidenceLevel (2 tests)
+- TestCalculateConfidence (10 tests)
+- TestAnalyzeResponseForFPIndicators (8 tests)
+- TestAnalyzeResponseForExploitation (9 tests)
+- TestVulnerabilityFinding (10 tests)
+- TestCreateFinding (5 tests)
+- TestPatternDictionaries (3 tests)
+```
+
+**`tests/unit/test_llm_utils.py`:** Agregados 33 tests ✅
+```python
+- TestValidateToolInvocation (12 tests)
+- TestValidateUrl (7 tests)
+- TestValidateFilePath (3 tests)
+- TestValidateCommand (3 tests)
+- TestValidateAllInvocations (5 tests)
+- TestKnownTools (4 tests)
+```
+
+### Criterios de Aceptación ✅
+
+| Métrica | Valor Objetivo | Resultado |
+|---------|----------------|-----------|
+| Tests de confidence scoring | 100% pasando | 46/46 ✅ |
+| Tests de validación | 100% pasando | 33/33 ✅ |
+| Cobertura confidence.py | ≥ 80% | 100% ✅ |
+| Cobertura utils.py | ≥ 80% | 95% ✅ |
+| No regresiones en tests existentes | 0 fallos | 0 fallos ✅ |
+| Coverage total módulo LLM | > 60% | 62% ✅ |
+
+### Rama Git
+```bash
+git checkout -b feature/fase-2-prompt-optimization
+```
+
+---
+
+## FASE 2 (Plan Original): Refactorizar System Prompt Principal
 
 **Archivo:** `strix/agents/StrixAgent/system_prompt.jinja`
 

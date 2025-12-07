@@ -106,12 +106,59 @@
 4. Confirm reproducibility and document request parameters that control scheme/host/headers/method and redirect behavior.
 </validation>
 
-<false_positives>
-- Client-side fetches only (no server request)
-- Strict allowlists with DNS pinning and no redirect following
-- SSRF simulators/mocks returning canned responses without real egress
-- Blocked egress confirmed by uniform errors across all targets and protocols
-</false_positives>
+<false_positive_indicators>
+These responses typically indicate FALSE POSITIVES - not actual SSRF:
+
+CLIENT-SIDE ONLY FETCHES (NOT SSRF):
+- JavaScript/browser making the request (check Network tab vs server logs)
+- No server-side activity in OAST callback timestamps
+- Request originates from user's IP, not server's IP
+- Image/iframe loaded client-side without server proxy
+
+STRICT ALLOWLIST ENFORCED (NOT EXPLOITABLE):
+- "Invalid URL" or "URL not allowed" error messages
+- "Domain not in allowlist" responses
+- Consistent error regardless of internal/external URLs
+- DNS resolution blocked for non-allowed domains
+
+NO EGRESS/BLOCKED (NOT EXPLOITABLE):
+- Same error response for all targets (internal and external)
+- Network timeout without any OAST callback
+- Firewall/security group blocking outbound connections
+- No difference between 127.0.0.1 and external domains
+
+MOCK/SIMULATOR RESPONSES (NOT REAL SSRF):
+- Generic "Resource fetched" without actual content
+- Same response body regardless of URL parameter
+- Testing environment with canned responses
+- Sandbox without real network access
+
+URL VALIDATION BYPASSES THAT DON'T WORK:
+- Parser rejects malformed URLs before fetch
+- Redirects are not followed
+- Protocol scheme is strictly validated (only https://)
+- Port restrictions enforced (only 80/443)
+
+VERIFICATION CHECKLIST:
+□ Did you receive an OAST callback FROM THE SERVER (not your browser)?
+□ Can you access internal addresses (127.0.0.1, 169.254.169.254)?
+□ Is there evidence of server-side request (different response for internal vs external)?
+□ Can you access metadata endpoints or internal services?
+□ Are redirects followed by the server?
+
+EVIDENCE REQUIREMENTS FOR VALID SSRF:
+1. OAST callback showing server IP (not client IP) made the request
+2. Different responses for internal vs external URLs
+3. Successful access to metadata endpoint or internal service
+4. Response content from internal resource
+5. Proof that the SERVER made the request, not the client
+
+FALSE POSITIVE SCENARIOS:
+- "Got callback" → Verify it's from server IP, not browser
+- "URL parameter accepts any value" → Does it actually FETCH the URL?
+- "Error with internal IP" → Is it a different error than with external IPs?
+- "Image loaded" → Was it server-side proxy or client-side img tag?
+</false_positive_indicators>
 
 <impact>
 - Cloud credential disclosure with subsequent control-plane/API access

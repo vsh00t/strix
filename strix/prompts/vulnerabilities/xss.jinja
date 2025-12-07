@@ -148,11 +148,56 @@ URL: {% raw %}javascript:alert(1){% endraw %}
 4. Quantify impact beyond alert: data accessed, action performed, persistence achieved.
 </validation>
 
-<false_positives>
-- Reflected content safely encoded in the exact context
-- CSP with nonces/hashes and no inline/event handlers; Trusted Types enforced on sinks; DOMPurify in strict mode with URI allowlists
-- Scriptable contexts disabled (no HTML pass-through, safe URL schemes enforced)
-</false_positives>
+<false_positive_indicators>
+These responses typically indicate FALSE POSITIVES - not actual XSS:
+
+PROPERLY ENCODED OUTPUT (NOT XSS):
+- Payload appears in response but HTML entities are encoded (&lt; &gt; &amp; &quot;)
+- JavaScript strings have backslashes properly escaped
+- URL parameters are URL-encoded in output
+- Framework auto-escaping is active (React, Vue, Angular default modes)
+
+CSP BLOCKING EXECUTION (NOT EXPLOITABLE XSS):
+- Content-Security-Policy header present with restrictive settings
+- No 'unsafe-inline' or 'unsafe-eval' in script-src
+- Valid nonces or hashes required for script execution
+- Trusted Types enforced on DOM sinks
+- CSP violation reports in console but no actual execution
+
+SANITIZATION ACTIVE (NOT XSS):
+- DOMPurify or similar sanitizer processing input
+- HTML tags removed or neutralized
+- Event handlers stripped from output
+- Safe subset of HTML allowed (no script-related tags/attributes)
+
+INPUT VALIDATION (NOT XSS):
+- "Invalid characters" error before any rendering
+- Input rejected/filtered at application layer
+- Whitelist validation blocking payloads
+- Length restrictions preventing payload delivery
+
+CONTEXT MISMATCH (NOT EXPLOITABLE):
+- Payload reflected in non-executable context (e.g., inside text node, not attribute)
+- JavaScript context with proper JSON.stringify escaping
+- CSS context with proper sanitization
+
+VERIFICATION CHECKLIST:
+□ Does your payload actually EXECUTE (not just appear in source)?
+□ Can you trigger JavaScript execution (beyond DOM insertion)?
+□ Does the execution bypass CSP (if present)?
+□ Can you perform actions beyond showing an alert (exfiltration, CSRF)?
+□ Is the behavior reproducible across browsers?
+
+If you cannot demonstrate actual JavaScript execution with impact, the finding is likely:
+- A FALSE POSITIVE (input is properly handled)
+- Or LOW SEVERITY (reflection without execution)
+
+EVIDENCE REQUIREMENTS:
+- For reflected XSS: show the HTTP request and response with executing payload
+- For stored XSS: show where payload is stored and where it executes
+- For DOM XSS: show the source, sink, and execution flow
+- Always: provide screenshot or network capture of actual execution
+</false_positive_indicators>
 
 <pro_tips>
 1. Start with context classification, not payload brute force.
