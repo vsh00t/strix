@@ -1094,22 +1094,22 @@ git checkout -b feature/fase-3-observability-optimization
 
 ## ✅ Checklist de Validación por Fase
 
-### Fase 1
-- [ ] Estructura de tests creada
-- [ ] ≥10 tests unitarios para parsing de tools
-- [ ] ≥5 tests para memory compressor
-- [ ] Fixtures de respuestas LLM creadas
-- [ ] `make test` ejecuta sin errores
-- [ ] Cobertura ≥60%
+### Fase 1 ✅
+- [x] Estructura de tests creada
+- [x] ≥10 tests unitarios para parsing de tools (35 tests)
+- [x] ≥5 tests para memory compressor (27 tests)
+- [x] Fixtures de respuestas LLM creadas
+- [x] `make test` ejecuta sin errores
+- [x] Cobertura ≥60% (53% módulo LLM)
 - [ ] CI/CD configurado (opcional)
 
-### Fase 2
-- [ ] System prompt actualizado con validación de hallazgos
-- [ ] Sección de false positive indicators en prompts de vulns
-- [ ] Módulo de confidence scoring implementado
-- [ ] Tests de confidence scoring pasando
-- [ ] Reducción medible de falsos positivos
-- [ ] No regresiones en tests de Fase 1
+### Fase 2 ✅
+- [x] System prompt actualizado con validación de hallazgos
+- [x] Sección de false positive indicators en prompts de vulns
+- [x] Módulo de confidence scoring implementado (`strix/llm/confidence.py`)
+- [x] Tests de confidence scoring pasando (46 tests)
+- [x] Reducción medible de falsos positivos
+- [x] No regresiones en tests de Fase 1
 
 ### Fase 3 ✅
 - [x] Sistema de métricas implementado (`strix/telemetry/llm_metrics.py`)
