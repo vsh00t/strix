@@ -6,12 +6,16 @@ if [ -z "$CAIDO_PORT" ]; then
     exit 1
 fi
 
-caido-cli --listen 127.0.0.1:${CAIDO_PORT} \
-          --allow-guests \
-          --no-logging \
-          --no-open \
-          --import-ca-cert /app/certs/ca.p12 \
-          --import-ca-cert-pass "" > /dev/null 2>&1 &
+# Build Caido CLI arguments
+CAIDO_ARGS="--listen 127.0.0.1:${CAIDO_PORT} --allow-guests --no-logging --no-open --import-ca-cert /app/certs/ca.p12 --import-ca-cert-pass \"\""
+
+# Add upstream proxy if configured
+if [ -n "$UPSTREAM_PROXY" ]; then
+    echo "🔗 Configuring upstream proxy: $UPSTREAM_PROXY"
+    CAIDO_ARGS="$CAIDO_ARGS --upstream-proxy $UPSTREAM_PROXY"
+fi
+
+eval "caido-cli $CAIDO_ARGS" > /dev/null 2>&1 &
 
 echo "Waiting for Caido API to be ready..."
 for i in {1..30}; do

@@ -104,6 +104,8 @@ class DockerRuntime(AbstractRuntime):
                 self._tool_server_port = tool_server_port
                 self._tool_server_token = tool_server_token
 
+                upstream_proxy = os.getenv("STRIX_UPSTREAM_PROXY", "")
+
                 container = self.client.containers.run(
                     STRIX_IMAGE,
                     command="sleep infinity",
@@ -121,6 +123,7 @@ class DockerRuntime(AbstractRuntime):
                         "CAIDO_PORT": str(caido_port),
                         "TOOL_SERVER_PORT": str(tool_server_port),
                         "TOOL_SERVER_TOKEN": tool_server_token,
+                        "UPSTREAM_PROXY": upstream_proxy,
                     },
                     tty=True,
                 )

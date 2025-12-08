@@ -5,6 +5,7 @@ Handles fuzzing sessions, differential analysis, and result aggregation.
 import asyncio
 import hashlib
 import logging
+import os
 import secrets
 import time
 from dataclasses import dataclass, field
@@ -446,10 +447,17 @@ _global_fuzzer_manager: FuzzerManager | None = None
 
 
 def get_fuzzer_manager() -> FuzzerManager:
-    """Get or create the global fuzzer manager."""
+    """Get or create the global fuzzer manager.
+    
+    The fuzzer will route traffic through Caido proxy by default,
+    which may have an upstream proxy configured (e.g., Burp Suite).
+    """
     global _global_fuzzer_manager
     if _global_fuzzer_manager is None:
-        _global_fuzzer_manager = FuzzerManager()
+        # Use Caido as proxy so traffic is captured and can be forwarded to upstream proxy
+        caido_port = os.getenv("CAIDO_PORT", "56789")
+        proxy_url = f"http://127.0.0.1:{caido_port}"
+        _global_fuzzer_manager = FuzzerManager(proxy_url=proxy_url)
     return _global_fuzzer_manager
 
 

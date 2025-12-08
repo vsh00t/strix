@@ -306,6 +306,17 @@ Examples:
         ),
     )
 
+    parser.add_argument(
+        "--upstream-proxy",
+        type=str,
+        help=(
+            "Route all HTTP traffic through an upstream proxy (e.g., Burp Suite). "
+            "Format: http://host:port (e.g., http://host.docker.internal:8080 for Burp on macOS/Windows, "
+            "or http://172.17.0.1:8080 for Linux). "
+            "Can also be set via STRIX_UPSTREAM_PROXY environment variable."
+        ),
+    )
+
     args = parser.parse_args()
 
     if args.instruction:
@@ -336,6 +347,11 @@ Examples:
             parser.error(f"Invalid target '{target}'")
 
     assign_workspace_subdirs(args.targets_info)
+
+    # Set upstream proxy environment variable if provided via CLI
+    # (CLI argument takes precedence over environment variable)
+    if args.upstream_proxy:
+        os.environ["STRIX_UPSTREAM_PROXY"] = args.upstream_proxy
 
     return args
 
