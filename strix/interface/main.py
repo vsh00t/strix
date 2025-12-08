@@ -10,6 +10,7 @@ import os
 import shutil
 import sys
 from pathlib import Path
+from typing import Any
 
 import litellm
 from docker.errors import DockerException
@@ -56,10 +57,7 @@ def validate_environment() -> None:  # noqa: PLR0912, PLR0915
     )
 
     if not os.getenv("LLM_API_KEY"):
-        if not has_base_url:
-            missing_required_vars.append("LLM_API_KEY")
-        else:
-            missing_optional_vars.append("LLM_API_KEY")
+        missing_optional_vars.append("LLM_API_KEY")
 
     if not has_base_url:
         missing_optional_vars.append("LLM_API_BASE")
@@ -92,13 +90,6 @@ def validate_environment() -> None:  # noqa: PLR0912, PLR0915
                     " - Model name to use with litellm (e.g., 'openai/gpt-5')\n",
                     style="white",
                 )
-            elif var == "LLM_API_KEY":
-                error_text.append("• ", style="white")
-                error_text.append("LLM_API_KEY", style="bold cyan")
-                error_text.append(
-                    " - API key for the LLM provider (required for cloud providers)\n",
-                    style="white",
-                )
 
         if missing_optional_vars:
             error_text.append("\nOptional environment variables:\n", style="white")
@@ -106,7 +97,11 @@ def validate_environment() -> None:  # noqa: PLR0912, PLR0915
                 if var == "LLM_API_KEY":
                     error_text.append("• ", style="white")
                     error_text.append("LLM_API_KEY", style="bold cyan")
-                    error_text.append(" - API key for the LLM provider\n", style="white")
+                    error_text.append(
+                        " - API key for the LLM provider "
+                        "(not needed for local models, Vertex AI, AWS, etc.)\n",
+                        style="white",
+                    )
                 elif var == "LLM_API_BASE":
                     error_text.append("• ", style="white")
                     error_text.append("LLM_API_BASE", style="bold cyan")
@@ -125,14 +120,12 @@ def validate_environment() -> None:  # noqa: PLR0912, PLR0915
         error_text.append("\nExample setup:\n", style="white")
         error_text.append("export STRIX_LLM='openai/gpt-5'\n", style="dim white")
 
-        if "LLM_API_KEY" in missing_required_vars:
-            error_text.append("export LLM_API_KEY='your-api-key-here'\n", style="dim white")
-
         if missing_optional_vars:
             for var in missing_optional_vars:
                 if var == "LLM_API_KEY":
                     error_text.append(
-                        "export LLM_API_KEY='your-api-key-here'  # optional with local models\n",
+                        "export LLM_API_KEY='your-api-key-here'  "
+                        "# not needed for local models, Vertex AI, AWS, etc.\n",
                         style="dim white",
                     )
                 elif var == "LLM_API_BASE":
@@ -189,18 +182,12 @@ async def warm_up_llm() -> None:
     try:
         model_name = os.getenv("STRIX_LLM", "openai/gpt-5")
         api_key = os.getenv("LLM_API_KEY")
-
-        if api_key:
-            litellm.api_key = api_key
-
         api_base = (
             os.getenv("LLM_API_BASE")
             or os.getenv("OPENAI_API_BASE")
             or os.getenv("LITELLM_BASE_URL")
             or os.getenv("OLLAMA_API_BASE")
         )
-        if api_base:
-            litellm.api_base = api_base
 
         test_messages = [
             {"role": "system", "content": "You are a helpful assistant."},
@@ -209,11 +196,17 @@ async def warm_up_llm() -> None:
 
         llm_timeout = int(os.getenv("LLM_TIMEOUT", "600"))
 
-        response = litellm.completion(
-            model=model_name,
-            messages=test_messages,
-            timeout=llm_timeout,
-        )
+        completion_kwargs: dict[str, Any] = {
+            "model": model_name,
+            "messages": test_messages,
+            "timeout": llm_timeout,
+        }
+        if api_key:
+            completion_kwargs["api_key"] = api_key
+        if api_base:
+            completion_kwargs["api_base"] = api_base
+
+        response = litellm.completion(**completion_kwargs)
 
         validate_llm_response(response)
 

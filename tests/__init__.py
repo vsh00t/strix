@@ -1,1 +1,1 @@
-"""Strix Test Suite."""
+# Strix Test Suite
