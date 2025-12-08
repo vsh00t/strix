@@ -1,0 +1,178 @@
+<tools>
+  <tool name="add_finding">
+    <description>Add a security finding to the correlation engine for analysis.</description>
+    <details>The correlation engine collects findings from different tools and sources
+to identify relationships, attack chains, and reduce false positives.
+
+Severity levels: critical, high, medium, low, info
+Categories: sqli, xss, idor, ssrf, csrf, rce, auth_bypass, file_upload, path_traversal, etc.</details>
+    <parameters>
+      <parameter name="finding_id" type="string" required="true">
+        <description>Unique identifier for the finding</description>
+      </parameter>
+      <parameter name="title" type="string" required="true">
+        <description>Short title describing the vulnerability</description>
+      </parameter>
+      <parameter name="category" type="string" required="true">
+        <description>Vulnerability category (sqli, xss, idor, ssrf, csrf, rce, auth_bypass, etc.)</description>
+      </parameter>
+      <parameter name="url" type="string" required="false">
+        <description>URL where the vulnerability was found</description>
+      </parameter>
+      <parameter name="severity" type="string" required="false">
+        <description>Severity level: critical, high, medium, low, info (default: medium)</description>
+      </parameter>
+      <parameter name="description" type="string" required="false">
+        <description>Detailed description of the finding</description>
+      </parameter>
+      <parameter name="parameter" type="string" required="false">
+        <description>Vulnerable parameter name if applicable</description>
+      </parameter>
+      <parameter name="evidence" type="string" required="false">
+        <description>Evidence supporting the finding (error messages, responses, etc.)</description>
+      </parameter>
+      <parameter name="tool" type="string" required="false">
+        <description>Tool that discovered the finding (browser, fuzzer, oast, etc.)</description>
+      </parameter>
+      <parameter name="confidence" type="float" required="false">
+        <description>Confidence score from 0.0 to 1.0 (default: 0.5)</description>
+      </parameter>
+    </parameters>
+    <returns type="Dict[str, Any]">
+      <description>Response containing success status, is_new flag, finding_id, and message</description>
+    </returns>
+    <examples>
+  # Add a SQL injection finding
+  <function=add_finding>
+  <parameter=finding_id>sqli_001</parameter>
+  <parameter=title>SQL Injection in login endpoint</parameter>
+  <parameter=category>sqli</parameter>
+  <parameter=url>https://target.com/api/login</parameter>
+  <parameter=severity>high</parameter>
+  <parameter=parameter>username</parameter>
+  <parameter=evidence>Database error: syntax error near 'admin'--'</parameter>
+  <parameter=tool>browser</parameter>
+  <parameter=confidence>0.85</parameter>
+  </function>
+
+  # Add an XSS finding
+  <function=add_finding>
+  <parameter=finding_id>xss_001</parameter>
+  <parameter=title>Reflected XSS in search</parameter>
+  <parameter=category>xss</parameter>
+  <parameter=url>https://target.com/search</parameter>
+  <parameter=severity>medium</parameter>
+  <parameter=parameter>q</parameter>
+  </function>
+    </examples>
+  </tool>
+
+  <tool name="correlate_findings">
+    <description>Run correlation analysis on all collected findings.</description>
+    <details>Analyzes relationships between findings to:
+- Identify attack chains that combine multiple vulnerabilities
+- Group related vulnerabilities by endpoint or parameter
+- Boost confidence scores for corroborated findings
+- Calculate combined severity for related issues</details>
+    <parameters></parameters>
+    <returns type="Dict[str, Any]">
+      <description>Response containing correlations_found count, attack_chains_detected count, 
+top correlations list, and attack_chains list</description>
+    </returns>
+    <examples>
+  # Run correlation analysis
+  <function=correlate_findings></function>
+    </examples>
+  </tool>
+
+  <tool name="get_attack_chains">
+    <description>Get all detected attack chains from correlated findings.</description>
+    <details>Attack chains represent sequences of vulnerabilities that can be
+exploited together for greater impact. Examples:
+- SQL Injection → Data Exfiltration → Lateral Movement
+- XSS → Session Hijacking → Account Takeover
+- SSRF → Internal Service Access → RCE</details>
+    <parameters></parameters>
+    <returns type="Dict[str, Any]">
+      <description>Response containing count and list of attack_chains with chain_type, 
+combined_severity, exploitation_steps, and impact</description>
+    </returns>
+    <examples>
+  # Get detected attack chains
+  <function=get_attack_chains></function>
+    </examples>
+  </tool>
+
+  <tool name="get_findings_summary">
+    <description>Get summary statistics of all findings in the correlation engine.</description>
+    <details>Provides breakdown of findings by:
+- Severity (critical, high, medium, low, info)
+- Category (sqli, xss, idor, etc.)
+- Source tool (browser, fuzzer, oast, etc.)
+- URL/endpoint grouping</details>
+    <parameters></parameters>
+    <returns type="Dict[str, Any]">
+      <description>Response containing summary with total_findings, by_severity, 
+by_category, by_tool, and endpoints statistics</description>
+    </returns>
+    <examples>
+  # Get findings summary
+  <function=get_findings_summary></function>
+    </examples>
+  </tool>
+
+  <tool name="check_false_positive">
+    <description>Check if a finding is likely a false positive.</description>
+    <details>Analyzes the finding against known false positive indicators
+and correlation data to estimate likelihood of being a false positive.
+Returns a score from 0.0 (likely real) to 1.0 (likely false positive).</details>
+    <parameters>
+      <parameter name="finding_id" type="string" required="true">
+        <description>ID of the finding to check</description>
+      </parameter>
+    </parameters>
+    <returns type="Dict[str, Any]">
+      <description>Response containing false_positive_score, assessment 
+(likely_real, needs_verification, likely_false_positive), and recommendation</description>
+    </returns>
+    <examples>
+  # Check if a finding is a false positive
+  <function=check_false_positive>
+  <parameter=finding_id>sqli_001</parameter>
+  </function>
+    </examples>
+  </tool>
+
+  <tool name="deduplicate_findings">
+    <description>Deduplicate findings based on fingerprints.</description>
+    <details>Removes duplicate findings that have the same:
+- Category
+- URL
+- Parameter
+- Title
+
+Use this to clean up findings before generating reports.</details>
+    <parameters></parameters>
+    <returns type="Dict[str, Any]">
+      <description>Response containing total_before, unique_findings, and duplicates_removed counts</description>
+    </returns>
+    <examples>
+  # Deduplicate findings
+  <function=deduplicate_findings></function>
+    </examples>
+  </tool>
+
+  <tool name="clear_correlation_engine">
+    <description>Clear all findings and correlations from the engine.</description>
+    <details>Use this to reset the correlation engine for a new scan or target.
+All findings, correlations, and attack chains will be removed.</details>
+    <parameters></parameters>
+    <returns type="Dict[str, Any]">
+      <description>Response containing findings_cleared count</description>
+    </returns>
+    <examples>
+  # Clear the correlation engine
+  <function=clear_correlation_engine></function>
+    </examples>
+  </tool>
+</tools>

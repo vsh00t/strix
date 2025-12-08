@@ -1,0 +1,162 @@
+<tools>
+  <tool name="generate_report">
+    <description>Generate a comprehensive security report.</description>
+    <details>Generates a full security assessment report with findings, attack chains,
+remediation guidance, and risk scoring. Available formats: json, markdown, html, text.
+
+The report includes:
+- Executive summary with risk score
+- Severity breakdown
+- Attack chain analysis
+- Detailed findings with evidence
+- Remediation guidance for each vulnerability</details>
+    <parameters>
+      <parameter name="format_type" type="string" required="false">
+        <description>Report format: json, markdown, html, text (default: markdown)</description>
+      </parameter>
+      <parameter name="include_evidence" type="boolean" required="false">
+        <description>Include evidence in findings (default: true)</description>
+      </parameter>
+      <parameter name="include_remediation" type="boolean" required="false">
+        <description>Include remediation guidance (default: true)</description>
+      </parameter>
+      <parameter name="target" type="string" required="false">
+        <description>Target URL to include in the report</description>
+      </parameter>
+    </parameters>
+    <returns type="Dict[str, Any]">
+      <description>Response containing success status, format, and the generated report content</description>
+    </returns>
+    <examples>
+  # Generate a markdown report
+  <function=generate_report>
+  <parameter=format_type>markdown</parameter>
+  <parameter=target>https://target.com</parameter>
+  </function>
+
+  # Generate JSON report without evidence
+  <function=generate_report>
+  <parameter=format_type>json</parameter>
+  <parameter=include_evidence>false</parameter>
+  </function>
+    </examples>
+  </tool>
+
+  <tool name="generate_executive_summary">
+    <description>Generate an executive summary of findings.</description>
+    <details>Creates a high-level overview suitable for management including:
+- Overall risk score and level
+- Total and unique findings count
+- Severity breakdown
+- Top priority issues
+- Key recommendations</details>
+    <parameters>
+      <parameter name="target" type="string" required="false">
+        <description>Target URL to include in the summary</description>
+      </parameter>
+    </parameters>
+    <returns type="Dict[str, Any]">
+      <description>Response containing executive summary with risk score, severity breakdown, and top priorities</description>
+    </returns>
+    <examples>
+  # Generate executive summary
+  <function=generate_executive_summary>
+  <parameter=target>https://target.com</parameter>
+  </function>
+    </examples>
+  </tool>
+
+  <tool name="export_findings">
+    <description>Export findings to a file or return as content.</description>
+    <details>Export all findings in various formats for external tools or archiving.
+Supported formats: json, csv, text
+
+Can either return content directly or write to a file.</details>
+    <parameters>
+      <parameter name="format_type" type="string" required="false">
+        <description>Export format: json, csv, text (default: json)</description>
+      </parameter>
+      <parameter name="file_path" type="string" required="false">
+        <description>Path to save the export file. If not provided, returns content directly.</description>
+      </parameter>
+    </parameters>
+    <returns type="Dict[str, Any]">
+      <description>Response containing success status, format, count, and either file_path or content</description>
+    </returns>
+    <examples>
+  # Export to JSON file
+  <function=export_findings>
+  <parameter=format_type>json</parameter>
+  <parameter=file_path>/tmp/findings.json</parameter>
+  </function>
+
+  # Get CSV content directly
+  <function=export_findings>
+  <parameter=format_type>csv</parameter>
+  </function>
+    </examples>
+  </tool>
+
+  <tool name="get_remediation_guidance">
+    <description>Get remediation guidance for a vulnerability category.</description>
+    <details>Returns detailed remediation guidance including:
+- Step-by-step remediation instructions
+- OWASP and CWE references
+- Priority level (immediate, short_term, long_term)
+- Estimated effort
+
+Available categories: sqli, xss, idor, ssrf, csrf, auth_bypass, rce, file_upload, path_traversal, information_disclosure</details>
+    <parameters>
+      <parameter name="category" type="string" required="true">
+        <description>Vulnerability category (e.g., sqli, xss, idor, ssrf)</description>
+      </parameter>
+    </parameters>
+    <returns type="Dict[str, Any]">
+      <description>Response containing remediation guidance with steps, references, and priority</description>
+    </returns>
+    <examples>
+  # Get SQL injection remediation guidance
+  <function=get_remediation_guidance>
+  <parameter=category>sqli</parameter>
+  </function>
+    </examples>
+  </tool>
+
+  <tool name="calculate_risk_score">
+    <description>Calculate overall risk score for the assessment.</description>
+    <details>Calculates a risk score from 0-10 based on:
+- Severity distribution of findings
+- Attack chains detected
+- Confidence scores
+
+Risk levels: None (0), Low (1-3), Medium (4-5), High (6-7), Critical (8-10)</details>
+    <parameters></parameters>
+    <returns type="Dict[str, Any]">
+      <description>Response containing risk_score (0-10), risk_level, total_findings, and attack_chains count</description>
+    </returns>
+    <examples>
+  # Calculate risk score
+  <function=calculate_risk_score></function>
+    </examples>
+  </tool>
+
+  <tool name="set_report_target">
+    <description>Set the target URL for reports.</description>
+    <details>Sets the target URL that will be included in generated reports.
+This should be set before generating reports to properly identify the assessment target.</details>
+    <parameters>
+      <parameter name="target" type="string" required="true">
+        <description>Target URL (e.g., https://target.com)</description>
+      </parameter>
+    </parameters>
+    <returns type="Dict[str, Any]">
+      <description>Response containing success status and confirmation message</description>
+    </returns>
+    <examples>
+  # Set report target
+  <function=set_report_target>
+  <parameter=target>https://example.com</parameter>
+  </function>
+    </examples>
+  </tool>
+</tools>
